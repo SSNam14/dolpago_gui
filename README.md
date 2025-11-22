@@ -19,6 +19,9 @@ https://drive.google.com/file/d/1gYMLynAMEK1KPPABlQsEc9GQRkxNehSP/view?usp=drive
 5) 맨 처음 돌에서 아무거나 누르면 잠시 후에 확률 계산 후 가장 최적의 (9/7 or 7/9기준) 옵션을 녹색으로 추천해줌
 <img width="636" height="391" alt="image" src="https://github.com/user-attachments/assets/3cb29480-b534-4767-8a77-208bf95d8954" />
 
+![GIF 2025-11-22 오후 10-59-38](https://github.com/user-attachments/assets/b8f56d3a-8542-4057-abe3-775346c4d664)
+
+
 6) 도달 확률이 0이면 더이상 추천하지 않음
 
 7) (메인 창의 Auto Reset 체크 시) 돌 목록에서 새 돌을 선택하면 자동으로 인식하여 다시 0/0/0/75%에서 시작 
