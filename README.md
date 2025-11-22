@@ -25,3 +25,8 @@ https://drive.google.com/file/d/1gYMLynAMEK1KPPABlQsEc9GQRkxNehSP/view?usp=drive
 6) 도달 확률이 0이면 더이상 추천하지 않음
 
 7) (메인 창의 Auto Reset 체크 시) 돌 목록에서 새 돌을 선택하면 자동으로 인식하여 다시 0/0/0/75%에서 시작 
+
+
+내부 확률 계산 로직은 
+https://github.com/jaentrouble/LoFAGO
+로파고님의 로직을 활용하였습니다.
