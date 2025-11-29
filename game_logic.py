@@ -47,6 +47,37 @@ class StoneFacetingLogic:
         # Round to avoid floating point errors
         self.current_probability = round(self.current_probability, 2)
 
+    def calculate_next_probability(self, success):
+        """
+        Calculate what the next probability WOULD be.
+        Does not update state.
+        """
+        if success:
+            prob = max(self.min_probability, self.current_probability - 0.10)
+        else:
+            prob = min(self.max_probability, self.current_probability + 0.10)
+        return round(prob, 2)
+
+    def set_probability_from_ocr(self, label):
+        """
+        Set probability directly from OCR label.
+        Label: '2'~'7'
+        """
+        mapping = {
+            '2': 0.25,
+            '3': 0.35,
+            '4': 0.45,
+            '5': 0.55,
+            '6': 0.65,
+            '7': 0.75
+        }
+        
+        if label in mapping:
+            self.current_probability = mapping[label]
+            print(f"Probability updated from OCR: {label} -> {self.current_probability}")
+        else:
+            print(f"OCR Label '{label}' not in mapping. Keeping current probability: {self.current_probability}")
+
     def get_current_counts(self):
         """Return current success count for each row."""
         counts = {}
@@ -75,25 +106,46 @@ class StoneFacetingLogic:
         
         return c1, c2, c3, s1, s2, s3, p_idx
 
+    def set_targets(self, primary, secondary):
+        """
+        Set target success counts.
+        primary: Row 1 target (e.g., 9)
+        secondary: Row 2 target (e.g., 7)
+        """
+        self.target_r1_primary = primary
+        self.target_r2_secondary = secondary
+        self.solve.cache_clear()
+        print(f"Targets updated: R1>={primary}, R2>={secondary}")
+
+    def set_penalty_limit(self, limit):
+        """
+        Set max allowed penalties (Row 3).
+        """
+        self.target_r3_max = limit
+        self.solve.cache_clear()
+        print(f"Penalty limit updated: Max {limit}")
+
     @lru_cache(maxsize=None)
-    def solve(self, c1, c2, c3, s1, s2, s3, p_idx):
+    def solve(self, c1, c2, c3, s1, s2, s3, p_idx, t1, t2, t3):
         """
         Calculate Q-values (Win Probability) for clicking Row 1, 2, or 3.
         Returns tuple (q1, q2, q3).
+        t1, t2: Primary/Secondary targets (e.g., 9, 7)
+        t3: Penalty limit (e.g., 4)
         """
         # Pruning: If Row 3 successes exceed max, we lost.
-        if s3 > self.target_r3_max:
+        if s3 > t3:
             return (0.0, 0.0, 0.0)
 
         # Base Case: All slots filled
         if c1 == 0 and c2 == 0 and c3 == 0:
             # Check Win Condition
-            # 9/6 OR 6/9
-            cond1 = (s1 >= 9 and s2 >= 6)
-            cond2 = (s1 >= 6 and s2 >= 9)
+            # Primary/Secondary OR Secondary/Primary
+            cond1 = (s1 >= t1 and s2 >= t2)
+            cond2 = (s1 >= t2 and s2 >= t1)
             
-            if (cond1 or cond2) and s3 <= self.target_r3_max:
-                return (0.0, 0.0, 0.0) # Values don't matter, but we need a return format. 
+            if (cond1 or cond2) and s3 <= t3:
+                return (0.0, 0.0, 0.0) # Win (Value doesn't matter for base case return in this structure) 
                 # Wait, this function returns Q-values for *moves*.
                 # If no moves left, we shouldn't be calling this?
                 # Actually, the recursive calls take max(solve(...)).
@@ -105,12 +157,20 @@ class StoneFacetingLogic:
         # Helper for recursion
         def get_value(nc1, nc2, nc3, ns1, ns2, ns3, np_idx):
             if nc1 == 0 and nc2 == 0 and nc3 == 0:
-                if ns3 > self.target_r3_max: return 0.0
-                c1_win = (ns1 >= 9 and ns2 >= 6)
-                c2_win = (ns1 >= 6 and ns2 >= 9)
+                if ns3 > t3: return 0.0
+                c1_win = (ns1 >= t1 and ns2 >= t2)
+                c2_win = (ns1 >= t2 and ns2 >= t1)
                 return 1.0 if (c1_win or c2_win) else 0.0
             
-            qs = self.solve(nc1, nc2, nc3, ns1, ns2, ns3, np_idx)
+            # Optimization: Clamp state values to reduce cache space
+            # We only care if s1/s2 reach the max target. Anything higher is equivalent.
+            limit = max(t1, t2)
+            c_ns1 = min(ns1, limit)
+            c_ns2 = min(ns2, limit)
+            c_ns3 = min(ns3, t3 + 1)
+            
+            qs = self.solve(nc1, nc2, nc3, c_ns1, c_ns2, c_ns3, np_idx, t1, t2, t3)
+            
             # We pick the best move
             best = -1.0
             if nc1 > 0: best = max(best, qs[0])
@@ -165,7 +225,8 @@ class StoneFacetingLogic:
         s2_c = min(s2, 9)
         s3_c = min(s3, 5)
         
-        q_values = self.solve(c1, c2, c3, s1_c, s2_c, s3_c, p_idx)
+        q_values = self.solve(c1, c2, c3, s1_c, s2_c, s3_c, p_idx, 
+                            self.target_r1_primary, self.target_r2_secondary, self.target_r3_max)
         
         # Filter out invalid moves (where c=0)
         valid_qs = []
@@ -194,7 +255,8 @@ class StoneFacetingLogic:
         s2_c = min(s2, 9)
         s3_c = min(s3, 5)
         
-        q_values = self.solve(c1, c2, c3, s1_c, s2_c, s3_c, p_idx)
+        q_values = self.solve(c1, c2, c3, s1_c, s2_c, s3_c, p_idx,
+                            self.target_r1_primary, self.target_r2_secondary, self.target_r3_max)
         
         best = 0.0
         if c1 > 0: best = max(best, q_values[0])

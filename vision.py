@@ -2,6 +2,7 @@ import mss
 import numpy as np
 from PIL import Image
 import pyautogui
+import cv2
 
 class Vision:
     def __init__(self, coords):
@@ -108,3 +109,30 @@ class Vision:
         target_x = region_info['x'] + self.coords['button_x']
         target_y = region_info['y'] + y_offset
         pyautogui.click(target_x, target_y)
+
+    def capture_ocr_area(self, region_info, ocr_coords, filename):
+        monitor = {
+            'top': region_info['y'] + ocr_coords['y1'],
+            'left': region_info['x'] + ocr_coords['x1'],
+            'width': ocr_coords['x2'] - ocr_coords['x1'],
+            'height': ocr_coords['y2'] - ocr_coords['y1']
+        }
+        
+        with mss.mss() as sct:
+            screenshot = sct.grab(monitor)
+            img = Image.frombytes("RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
+            img.save(filename)
+
+    def get_ocr_image(self, region_info, ocr_coords):
+        monitor = {
+            'top': region_info['y'] + ocr_coords['y1'],
+            'left': region_info['x'] + ocr_coords['x1'],
+            'width': ocr_coords['x2'] - ocr_coords['x1'],
+            'height': ocr_coords['y2'] - ocr_coords['y1']
+        }
+        
+        with mss.mss() as sct:
+            screenshot = sct.grab(monitor)
+            # Convert to numpy array (BGRA -> BGR)
+            img_np = np.array(screenshot)
+            return cv2.cvtColor(img_np, cv2.COLOR_BGRA2BGR)
